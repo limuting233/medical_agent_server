@@ -1,0 +1,22 @@
+[project]
+name = "medical-agent"
+version = "0.1.0"
+description = ""
+authors = [
+    {name = "limuting233",email = "limuting233@gmail.com"}
+]
+readme = "README.md"
+requires-python = ">=3.12,<4.0"
+dependencies = [
+    "fastapi (>=0.128.0,<0.129.0)",
+    "uvicorn[standard] (>=0.40.0,<0.41.0)",
+    "langchain (>=1.2.0,<2.0.0)",
+    "langchain-openai (>=1.1.6,<2.0.0)",
+    "loguru (>=0.7.3,<0.8.0)",
+    "pydantic-settings (>=2.12.0,<3.0.0)"
+]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
