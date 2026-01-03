@@ -11,6 +11,7 @@ from app.graph.graph import init_checkpointer, close_checkpointer, init_store, c
 async def lifespan(app: FastAPI):
     """
     应用生命周期管理
+    :param app: FastAPI应用实例
     """
     await init_checkpointer()  # 初始化短期记忆数据库
     await init_store()  # 初始化长期记忆数据库
