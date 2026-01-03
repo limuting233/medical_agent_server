@@ -2,7 +2,7 @@ from langchain.agents import create_agent
 from langchain_openai import ChatOpenAI
 
 from app.core.config import settings
-from app.graph.general_doctor.prompt import DOCTOR_SYSTEM_PROMPT
+from app.graph.general_doctor.prompt import GENERAL_DOCTOR_SYSTEM_PROMPT
 
 
 class GeneralDoctorAgentBuilder:
@@ -26,6 +26,6 @@ class GeneralDoctorAgentBuilder:
             model=self.llm,
             tools=[],
             middleware=[],
-            system_prompt=DOCTOR_SYSTEM_PROMPT,
-            debug=False,
+            system_prompt=GENERAL_DOCTOR_SYSTEM_PROMPT,
+            debug=True,
         )

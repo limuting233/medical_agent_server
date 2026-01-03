@@ -27,5 +27,5 @@ class ReceptionistAgentBuilder:
             system_prompt=RECEPTIONIST_SYSTEM_PROMPT,
             tools=[],
             middleware=[],
-            debug=False,
+            debug=True,
         )

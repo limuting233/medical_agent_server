@@ -1,13 +1,71 @@
 from langchain_core.messages import SystemMessage, AIMessage
 from langgraph.checkpoint.memory import InMemorySaver
+from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.graph import StateGraph, START, END
+from langgraph.store.postgres import AsyncPostgresStore
 
+from app.core.config import settings
 from app.graph.general_doctor.agent import GeneralDoctorAgentBuilder
 from app.graph.receptionist.agent import ReceptionistAgentBuilder
 from app.graph.state import MedicalAgentState
 from app.graph.triage_nurse.agent import TriageNurseAgentBuilder
 from app.graph.triage_nurse.prompt import TRIAGE_NURSE_SYSTEM_PROMPT
 from loguru import logger
+
+checkpointer: AsyncPostgresSaver | None = None  # 定义异步Postgres短期记忆保存器
+_checkpointer_context = None
+store: AsyncPostgresStore | None = None  # 定义异步Postgres长期记忆存储
+_store_context = None
+
+
+async def init_checkpointer():
+    """
+    初始化 PostgreSQL checkpointer 短期记忆
+    """
+    logger.info(f"正在初始化 PostgreSQL checkpointer 短期记忆 ...")
+    global checkpointer, _checkpointer_context
+    _checkpointer_context = AsyncPostgresSaver.from_conn_string(conn_string=settings.DB_URL)
+    checkpointer = await _checkpointer_context.__aenter__()
+    await checkpointer.setup()
+    logger.info(f"PostgreSQL checkpointer 短期记忆 初始化完成")
+
+
+async def close_checkpointer():
+    """
+    关闭 PostgreSQL checkpointer 短期记忆 连接
+    """
+    logger.info(f"正在关闭 PostgreSQL checkpointer 短期记忆 ...")
+    global checkpointer, _checkpointer_context
+    if checkpointer is not None and _checkpointer_context is not None:
+        await _checkpointer_context.__aexit__(None, None, None)
+        checkpointer = None
+        _checkpointer_context = None
+    logger.info(f"PostgreSQL checkpointer 短期记忆 连接已关闭")
+
+
+async def init_store():
+    """
+    初始化 PostgreSQL store 长期记忆
+    """
+    logger.info("正在初始化 PostgreSQL store 长期记忆 ...")
+    global store, _store_context
+    _store_context = AsyncPostgresStore.from_conn_string(conn_string=settings.DB_URL)
+    store = await _store_context.__aenter__()
+    await store.setup()
+    logger.info(f"PostgreSQL store 长期记忆 初始化完成")
+
+
+async def close_store():
+    """
+    关闭 PostgreSQL store 长期记忆 连接
+    """
+    logger.info(f"正在关闭 PostgreSQL store 长期记忆 ...")
+    global store, _store_context
+    if store is not None and _store_context is not None:
+        await _store_context.__aexit__(None, None, None)
+        store = None
+        _store_context = None
+    logger.info(f"PostgreSQL store 长期记忆 连接已关闭")
 
 
 async def triage_nurse_node(state: MedicalAgentState):
@@ -17,10 +75,6 @@ async def triage_nurse_node(state: MedicalAgentState):
     logger.info(f"进入triage_nurse_node")
 
     messages = state["messages"]  # 获取当前状态中的消息列表
-    # last_msg = messages[-1]  # 获取消息列表中的最后一条消息
-    # if isinstance(last_msg, AIMessage):
-    #     logger.info(f"接下来进入节点: finish，原因: 最后一条消息是AIMessage")
-    #     return {"next": "finish"}  # 更新state中的next字段
     triage_nurse_agent = TriageNurseAgentBuilder().build()  # 构建分诊护士智能体实例
     resp = await triage_nurse_agent.ainvoke(
         [SystemMessage(content=TRIAGE_NURSE_SYSTEM_PROMPT)] + messages)  # 调用分诊护士智能体，传入系统提示和消息列表
@@ -47,7 +101,7 @@ async def receptionist_node(state: MedicalAgentState):
     """
     接待员节点
     """
-    logger.info(f"进入receptionist_node, 当前状态: {state}")
+    logger.info(f"进入receptionist_node")
     receptionist_agent = ReceptionistAgentBuilder().build()  # 构建接待员智能体实例
     resp = await receptionist_agent.ainvoke({
         "messages": state["messages"],
@@ -69,6 +123,8 @@ def create_graph():
     """
     创建医疗智能体图
     """
+    if checkpointer is None:
+        raise RuntimeError("Checkpointer 未初始化")
     graph = StateGraph(MedicalAgentState)
 
     graph.add_node(triage_nurse_node, "triage_nurse_node")  # 添加分诊护士节点
@@ -90,4 +146,4 @@ def create_graph():
     graph.add_edge("general_doctor_node", END)  # 添加从全科医生节点到结束节点的边
     graph.add_edge("receptionist_node", END)  # 添加从接待员节点到结束节点的边
 
-    return graph.compile(checkpointer=InMemorySaver())
+    return graph.compile(checkpointer=checkpointer, store=store)
