@@ -112,11 +112,11 @@ async def receptionist_node(state: MedicalAgentState):
     }
 
 
-def route_triage_nurse(state: MedicalAgentState) -> str:
-    """
-    分诊护士路由函数，根据状态中的 next 字段决定下一个节点
-    """
-    return state["next"]
+# def route_triage_nurse(state: MedicalAgentState) -> str:
+#     """
+#     分诊护士路由函数，根据状态中的 next 字段决定下一个节点
+#     """
+#     return state["next"]
 
 
 def create_graph():
@@ -125,7 +125,7 @@ def create_graph():
     """
     if checkpointer is None:
         raise RuntimeError("Checkpointer 未初始化")
-    graph = StateGraph(MedicalAgentState)
+    graph = StateGraph(state_schema=MedicalAgentState)
 
     graph.add_node(triage_nurse_node, "triage_nurse_node")  # 添加分诊护士节点
     graph.add_node(general_doctor_node, "general_doctor_node")  # 添加全科医生节点
@@ -135,7 +135,7 @@ def create_graph():
 
     graph.add_conditional_edges(
         "triage_nurse_node",
-        route_triage_nurse,
+        lambda state: state["next"],
         {
             "general_doctor_node": "general_doctor_node",  # 医疗问诊 -> 全科医生
             "receptionist_node": "receptionist_node",  # 非医疗咨询 -> 接待员
